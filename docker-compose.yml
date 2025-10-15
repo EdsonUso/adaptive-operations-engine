@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.9-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  aoe-planner:
+    build: ./aoe-planner
+    container_name: aoe-planner
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_REDIS_HOST=redis
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  aoe-executor:
+    build: ./aoe-executor
+    container_name: aoe-executor
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      service-manager:
+        condition: service_started
+
+  service-manager:
+    build: ./aoe-service-manager
+    container_name: service-manager
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  aoe-target-app:
+    image: nginxdemos/hello:plain-text
+    container_name: meuapp_container_demo
+    ports:
+      - "9091:80"

@@ -49,7 +49,7 @@ graph TD;
 
 ## 🛠Tecnologias Utilizadas
 
-  - **Backend (Planner):** Java 17, Spring Boot 3
+  - **Backend (Planner):** Java 21, Spring Boot 3
   - **Backend (Executor):** Go
   - **Mensageria:** RabbitMQ
   - **Cache/Estado:** Redis

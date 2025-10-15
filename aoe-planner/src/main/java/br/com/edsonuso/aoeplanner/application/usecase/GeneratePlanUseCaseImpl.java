@@ -39,14 +39,22 @@ public class GeneratePlanUseCaseImpl implements GeneratePlanUseCase {
         log.debug("Avaliable actions: {}", avaliableActions);
         log.debug("Avaliable Facts: {}", currentFacts);
 
-        planner.findPlan(currentFacts, avaliableActions,goal)
+        planner.findPlan(currentFacts, avaliableActions, goal)
                 .ifPresentOrElse(
                         plan -> {
                             log.info("Plano encontrado com {} passo(s). Publicando...", plan.steps().size());
                             planPublisher.publish(plan);
                         },
-                        () ->  {
-                            log.warn("Nenhum plano encontrado para o objetivo: {}", goal.getName());
+                        () -> {
+                            log.warn("Nenhum plano direto encontrado para o objetivo: {}. Tentando plano de diagnóstico...", goal.getName());
+                            avaliableActions.stream()
+                                    .filter(action -> action.getPreconditions() == null || action.getPreconditions().isEmpty())
+                                    .findFirst()
+                                    .ifPresent(diagnosticAction -> {
+                                        log.info("Criando e publicando plano de diagnóstico com a ação: {}", diagnosticAction.getName());
+                                        var diagnosticPlan = new br.com.edsonuso.aoeplanner.model.Plan(goal, List.of(diagnosticAction), diagnosticAction.getCost());
+                                        planPublisher.publish(diagnosticPlan);
+                                    });
                         }
                 );
 

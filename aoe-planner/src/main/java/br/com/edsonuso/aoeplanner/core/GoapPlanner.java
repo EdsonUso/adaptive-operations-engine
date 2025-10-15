@@ -109,8 +109,10 @@ public class GoapPlanner {
         // Cria uma cópia do estado original
         Map<String, Object> newStateMap = convertFactsToMap(originalState);
 
-        // Aplica os efeitos
-        newStateMap.putAll(effects);
+        // Aplica os efeitos, se houver
+        if (effects != null) {
+            newStateMap.putAll(effects);
+        }
 
         // Converte de volta para Set<Fact>
         return convertMapToFacts(newStateMap);

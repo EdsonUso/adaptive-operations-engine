@@ -1,0 +1,11 @@
+groups:
+  - name: aoe_alerts
+    rules:
+      - alert: TargetAppDown
+        expr: up{job="aoe-target-app"} == 0
+        for: 10s
+        labels:
+          severity: 'critical'
+        annotations:
+          summary: 'Aplicação alvo está offline'
+          description: 'O serviço aoe-target-app não está respondendo ao Prometheus.'

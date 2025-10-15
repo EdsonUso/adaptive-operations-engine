@@ -1,7 +1,7 @@
 - name: RestartWebService
   preconditions:
     service_web_healthy: false
-    port_9090_in_use: false
+    port_9090_in_use: false # Re-adicionada para forçar o diagnóstico
   effects:
     service_web_healthy: true
   cost: 5
@@ -21,4 +21,13 @@
     type: "http"
     method: "POST"
     url: "http://service-manager:8081/actions/kill-process-on-port"
+    body: '{ "port": 9090 }'
+
+- name: DiagnosePortUsage
+  preconditions: {} # Sem pré-condições, pode ser sempre usada para descobrir fatos
+  cost: 1 # Custo baixo para ser uma opção atrativa quando faltam fatos
+  executor:
+    type: "http"
+    method: "POST"
+    url: "http://service-manager:8081/diagnostics/check-port"
     body: '{ "port": 9090 }'
