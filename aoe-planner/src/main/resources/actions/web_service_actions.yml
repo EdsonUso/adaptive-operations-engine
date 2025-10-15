@@ -1,0 +1,24 @@
+- name: RestartWebService
+  preconditions:
+    service_web_healthy: false
+    port_9090_in_use: false
+  effects:
+    service_web_healthy: true
+  cost: 5
+  executor:
+    type: "http"
+    method: "POST"
+    url: "http://service-manager:8081/actions/restart-container"
+    body: '{ "containerName": "meuapp_container_demo" }'
+
+- name: KillProcessBlockingPort
+  preconditions:
+    port_9090_in_use: true
+  effects:
+    port_9090_in_use: false
+  cost: 8
+  executor:
+    type: "http"
+    method: "POST"
+    url: "http://service-manager:8081/actions/kill-process-on-port"
+    body: '{ "port": 9090 }'
