@@ -1,4 +1,4 @@
-module aoe-service-manager
+module aoe-target-app
 
 go 1.24.1
 

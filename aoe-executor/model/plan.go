@@ -31,3 +31,9 @@ type Plan struct {
 	Steps      []Action `json:"steps"`
 	TotalCost  int      `json:"totalCost"`
 }
+
+// PlanDispatchPayload é o objeto que o executor recebe, contendo o objetivo e o plano.
+type PlanDispatchPayload struct {
+	TargetGoal Goal `json:"targetGoal"`
+	Plan       Plan `json:"plan"`
+}

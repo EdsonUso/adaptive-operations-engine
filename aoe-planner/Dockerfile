@@ -12,12 +12,12 @@ RUN mvn dependency:go-offline
 
 # Copia o resto do código fonte e compila o projeto
 COPY src ./src
-RUN mvn package -DskipTests
+RUN mvn package -Dmaven.test.skip=true
 
 # --- Final Stage ---
 # Usa uma imagem JRE (Java Runtime Environment) slim para a execução
 FROM eclipse-temurin:21-jre-alpine
-
+RUN apk add curl
 WORKDIR /app
 
 # Copia o arquivo .jar compilado do estágio de build para a imagem final

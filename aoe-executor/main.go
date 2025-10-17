@@ -108,24 +108,40 @@ func main() {
 
 	go func() {
 		for d := range msgs {
-			var plan model.Plan
-			err := json.Unmarshal(d.Body, &plan)
+			var payload model.PlanDispatchPayload
+			err := json.Unmarshal(d.Body, &payload)
 			if err != nil {
-				log.Printf("❌ Erro ao decodificar o plano JSON: %s", err)
+				log.Printf("❌ Erro ao decodificar o payload JSON: %s", err)
 				d.Reject(false)
 				continue
 			}
 
-			log.Printf("📥 Plano '%s' recebido com %d passo(s). Enviando para execução...", plan.TargetGoal.Name, len(plan.Steps))
+			log.Printf("📥 Payload para o objetivo '%s' recebido. Enviando plano para execução...", payload.TargetGoal.Name)
 
-			// Envia o plano para o executor, passando o cliente Redis e o publicador de replanejamento.
-			if err := executor.ExecutePlan(plan, rdb, replanPublisher); err != nil {
-				log.Printf("Execução do plano '%s' interrompida por falha.", plan.TargetGoal.Name)
+			// Envia o plano para o executor
+			err = executor.ExecutePlan(payload.Plan, rdb)
+			if err != nil {
+				log.Printf("Execução do plano para o objetivo '%s' interrompida por falha: %v", payload.TargetGoal.Name, err)
 			} else {
-				log.Printf("Execução do plano '%s' concluída.", plan.TargetGoal.Name)
+				log.Printf("Execução do plano para o objetivo '%s' concluída.", payload.TargetGoal.Name)
 			}
 
-			// Confirma o recebimento e processamento da mensagem.
+			// Lógica de Replanejamento
+			log.Printf("--- Iniciando lógica de replanejamento ---")
+			goalAchieved, err := executor.CheckGoal(payload.TargetGoal, rdb)
+			if err != nil {
+				log.Printf("--- Bloco de Erro do CheckGoal ---")
+				log.Printf("Erro ao verificar o estado do objetivo '%s': %v", payload.TargetGoal.Name, err)
+			} else if !goalAchieved {
+				log.Printf("--- Bloco !goalAchieved ---")
+				log.Printf("⚠️ O objetivo '%s' não foi alcançado. Solicitando replanejamento...", payload.TargetGoal.Name)
+				replanPublisher(payload.TargetGoal)
+			} else {
+				log.Printf("--- Bloco goalAchieved ---")
+				log.Printf("✅ Objetivo '%s' alcançado com sucesso!", payload.TargetGoal.Name)
+			}
+			log.Printf("--- Fim da lógica de replanejamento ---")
+
 			d.Ack(false)
 		}
 	}()

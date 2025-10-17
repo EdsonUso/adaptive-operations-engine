@@ -37,6 +37,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   aoe-executor:
     build: ./aoe-executor
@@ -58,8 +63,33 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
-  aoe-target-app:
-    image: nginxdemos/hello:plain-text
-    container_name: meuapp_container_demo
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
     ports:
-      - "9091:80"
+      - "9091:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus/prometheus.rules.yml:/etc/prometheus/prometheus.rules.yml
+    depends_on:
+      - aoe-target-app
+
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    depends_on:
+      aoe-planner:
+        condition: service_healthy
+
+  aoe-target-app:
+    build: ./aoe-target-app
+    container_name: aoe-target-app
+    restart: "no"
+    ports:
+      - "8081:8080"
+    expose:
+      - "8080"

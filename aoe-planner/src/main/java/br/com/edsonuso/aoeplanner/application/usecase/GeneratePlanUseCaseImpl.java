@@ -43,7 +43,7 @@ public class GeneratePlanUseCaseImpl implements GeneratePlanUseCase {
                 .ifPresentOrElse(
                         plan -> {
                             log.info("Plano encontrado com {} passo(s). Publicando...", plan.steps().size());
-                            planPublisher.publish(plan);
+                            planPublisher.publish(new br.com.edsonuso.aoeplanner.model.PlanDispatchPayload(goal, plan));
                         },
                         () -> {
                             log.warn("Nenhum plano direto encontrado para o objetivo: {}. Tentando plano de diagnóstico...", goal.getName());
@@ -53,7 +53,7 @@ public class GeneratePlanUseCaseImpl implements GeneratePlanUseCase {
                                     .ifPresent(diagnosticAction -> {
                                         log.info("Criando e publicando plano de diagnóstico com a ação: {}", diagnosticAction.getName());
                                         var diagnosticPlan = new br.com.edsonuso.aoeplanner.model.Plan(goal, List.of(diagnosticAction), diagnosticAction.getCost());
-                                        planPublisher.publish(diagnosticPlan);
+                                        planPublisher.publish(new br.com.edsonuso.aoeplanner.model.PlanDispatchPayload(goal, diagnosticPlan));
                                     });
                         }
                 );

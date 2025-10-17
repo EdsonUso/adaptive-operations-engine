@@ -2,6 +2,7 @@ package br.com.edsonuso.aoeplanner.publisher;
 
 import br.com.edsonuso.aoeplanner.application.ports.out.PlanPublisher;
 import br.com.edsonuso.aoeplanner.infrastructure.config.RabbitMQConfig;
+import br.com.edsonuso.aoeplanner.model.PlanDispatchPayload;
 import br.com.edsonuso.aoeplanner.model.Plan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,9 +19,9 @@ public class RabbitMQPlanPublisher implements PlanPublisher {
     private final RabbitTemplate rabbitTemplate;
 
     @Override
-    public void publish(Plan plan) {
+    public void publish(PlanDispatchPayload payload) {
         log.info("Publicando plano gerado para a exchange '{}' com a routing key '{}'", RabbitMQConfig.EXCHANGE_NAME, RabbitMQConfig.ROUTING_KEY);
-        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NAME, RabbitMQConfig.ROUTING_KEY, plan);
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NAME, RabbitMQConfig.ROUTING_KEY, payload);
         log.info("Plano publicado com sucesso.");
     }
 }

@@ -9,3 +9,12 @@ groups:
         annotations:
           summary: 'Aplicação alvo está offline'
           description: 'O serviço aoe-target-app não está respondendo ao Prometheus.'
+
+      - alert: Port9090Blocked
+        expr: aoe_port_in_use{job="aoe-service-manager"} == 1
+        for: 5s
+        labels:
+          severity: 'warning'
+        annotations:
+          summary: 'Porta 9090 está bloqueada'
+          description: 'A porta 9090 parece estar bloqueada por outro processo, impedindo a inicialização do serviço.'

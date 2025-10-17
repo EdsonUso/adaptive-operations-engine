@@ -9,7 +9,7 @@
     type: "http"
     method: "POST"
     url: "http://service-manager:8081/actions/restart-container"
-    body: '{ "containerName": "meuapp_container_demo" }'
+    body: '{ "containerName": "aoe-target-app" }'
 
 - name: KillProcessBlockingPort
   preconditions:

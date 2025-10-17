@@ -5,25 +5,16 @@ import br.com.edsonuso.aoeplanner.model.Plan;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import br.com.edsonuso.aoeplanner.model.PlanDispatchPayload;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("test")
-@RequiredArgsConstructor
 @Slf4j
 public class LoginPlanPublisher implements PlanPublisher {
 
-    private final ObjectMapper mapper;
-    private final ObjectMapper objectMapper;
-
     @Override
-    @SneakyThrows
-    public void publish(Plan plan) {
-        String planAsJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(plan);
-        log.info("--- PLANO GERADO E 'PUBLICADO' ---");
-        log.info(planAsJson);
-        log.info("---------------------------------");
+    public void publish(PlanDispatchPayload payload) {
+        log.info("Mock Plan Publisher: Plano para o objetivo '{}' não será publicado.", payload.targetGoal().getName());
     }
 }

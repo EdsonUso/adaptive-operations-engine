@@ -1,45 +1,60 @@
 package executor
 
 import (
-	"aoe-executor/model"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-redis/redis/v8"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"aoe-executor/model"
+
+	"github.com/go-redis/redis/v8"
 )
 
 // ExecutePlan itera sobre as ações de um plano e as executa em sequência.
-func ExecutePlan(plan model.Plan, rdb *redis.Client, replanPublisher func(goal model.Goal)) error {
+func ExecutePlan(plan model.Plan, rdb *redis.Client) error {
 	log.Printf("🚀 Iniciando execução do plano '%s' com %d passo(s).", plan.TargetGoal.Name, len(plan.Steps))
 
 	for _, action := range plan.Steps {
-		// Executa a ação e obtém os fatos resultantes (se for uma ação de diagnóstico)
 		discoveredFacts, err := executeAction(action)
 		if err != nil {
 			log.Printf("❌ Falha ao executar a ação '%s': %v", action.Name, err)
-
-			// Lógica de replanejamento
-			log.Println("  -> Atualizando a base de fatos com a falha.")
-			rdb.HSet(context.Background(), "fact-base", "service_restart_failed", "true")
-
-			log.Println("  -> Solicitando replanejamento para o objetivo original.")
-			replanPublisher(plan.TargetGoal)
-
-			return err // Interrompe a execução do plano atual para aguardar o novo.
+			// A lógica de replanejamento agora é tratada no loop principal.
+			return err
 		}
 
 		log.Printf("✅ Ação '%s' executada com sucesso.", action.Name)
-
-		// Aplica tanto os efeitos definidos na ação quanto os fatos descobertos pela execução
 		applyEffects(action, discoveredFacts, rdb)
 	}
 
-	log.Printf("🎉 Plano '%s' concluído com sucesso!", plan.TargetGoal.Name)
 	return nil
+}
+
+// CheckGoal verifica se o estado desejado do objetivo foi alcançado na base de fatos atual.
+func CheckGoal(goal model.Goal, rdb *redis.Client) (bool, error) {
+	currentState, err := rdb.HGetAll(context.Background(), "fact-base").Result()
+	if err != nil {
+		return false, fmt.Errorf("falha ao ler a base de fatos do Redis: %w", err)
+	}
+
+	for key, desiredValue := range goal.DesiredState {
+		currentValue, ok := currentState[key]
+		if !ok {
+			// Se a chave do objetivo nem existe nos fatos, o objetivo não foi alcançado.
+			return false, nil
+		}
+
+		// Compara os valores como strings para simplificar.
+		if fmt.Sprintf("%v", desiredValue) != currentValue {
+			return false, nil
+		}
+	}
+
+	// Se todas as chaves do estado desejado correspondem, o objetivo foi alcançado.
+	return true, nil
 }
 
 // executeAction executa uma única ação e retorna quaisquer fatos descobertos.
@@ -83,10 +98,8 @@ func executeHTTPAction(action model.Action) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("requisição falhou com status: %s", resp.Status)
 	}
 
-	// Decodifica o corpo da resposta para extrair fatos descobertos
 	var discoveredFacts map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&discoveredFacts); err != nil {
-		// Se não houver corpo ou o corpo não for um JSON de fatos, apenas ignore.
 		return nil, nil
 	}
 
@@ -96,7 +109,6 @@ func executeHTTPAction(action model.Action) (map[string]interface{}, error) {
 
 // applyEffects atualiza a Base de Fatos no Redis.
 func applyEffects(action model.Action, discoveredFacts map[string]interface{}, rdb *redis.Client) {
-	// Combina efeitos predefinidos com fatos descobertos
 	allEffects := make(map[string]interface{})
 	for k, v := range action.Effects {
 		allEffects[k] = v

@@ -19,3 +19,8 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
       - targets: ['aoe-target-app:8080']
+
+  - job_name: 'aoe-service-manager'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['service-manager:8081']
