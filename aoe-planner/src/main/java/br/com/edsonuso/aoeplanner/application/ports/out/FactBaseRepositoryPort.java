@@ -6,4 +6,5 @@ import java.util.Set;
 
 public interface FactBaseRepositoryPort {
     Set<Fact> getCurrentFactBase();
+    void updateFactBase(Set<Fact> facts);
 }
