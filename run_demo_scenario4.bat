@@ -22,7 +22,7 @@ echo.
 echo ETAPA 2: O sistema de monitoramento (simulado) detecta a anomalia...
 echo -----------------------------------------------------------------
 echo.
-docker exec redis redis-cli HSET fact-base malicious_containers_present true
+docker exec redis redis-cli SET fact:malicious_containers_present true
 echo.
 echo Fato 'malicious_containers_present' definido como 'true' no Redis.
 echo.

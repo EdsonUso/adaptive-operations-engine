@@ -1,0 +1,38 @@
+- name: RestartForHighMemory
+  preconditions:
+    service_web_memory_high: true
+    restart_did_not_fix_memory: false # Só tenta se a reinicialização simples ainda não falhou
+  effects:
+    service_web_memory_high: false
+  cost: 10
+  executor:
+    type: "http"
+    method: "POST"
+    url: "http://service-manager:8081/actions/restart-container"
+    body: '{ "containerName": "aoe-target-app" }'
+
+- name: DiagnoseMemoryLeak
+  preconditions:
+    service_web_memory_high: true
+    restart_did_not_fix_memory: true # Só diagnostica se a reinicialização já falhou
+  effects:
+    service_web_cache_corrupted: true
+  cost: 5
+  executor:
+    type: "http"
+    method: "GET"
+    url: "http://service-manager:8081/diagnostics/check-cache-corruption"
+
+- name: ClearServiceCacheAndRestart
+  preconditions:
+    service_web_cache_corrupted: true
+  effects:
+    service_web_memory_high: false
+    service_web_cache_corrupted: false
+    restart_did_not_fix_memory: false # Reseta o fato da falha
+  cost: 25
+  executor:
+    type: "http"
+    method: "POST"
+    url: "http://service-manager:8081/actions/clear-cache-and-restart"
+    body: '{ "containerName": "aoe-target-app" }'

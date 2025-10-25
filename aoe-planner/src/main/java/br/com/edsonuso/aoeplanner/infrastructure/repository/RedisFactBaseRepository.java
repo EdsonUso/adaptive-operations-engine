@@ -26,7 +26,18 @@ public class RedisFactBaseRepository implements FactBaseRepositoryPort {
             return Collections.emptySet();
         }
         return keys.stream()
-                .map(key -> new Fact(key.substring(FACT_KEY_PREFIX.length()), redisTemplate.opsForValue().get(key)))
+                .map(key -> {
+                    Object rawValue = redisTemplate.opsForValue().get(key);
+                    Object typedValue = rawValue;
+                    if (rawValue instanceof String s) {
+                        if (s.equalsIgnoreCase("true")) {
+                            typedValue = true;
+                        } else if (s.equalsIgnoreCase("false")) {
+                            typedValue = false;
+                        }
+                    }
+                    return new Fact(key.substring(FACT_KEY_PREFIX.length()), typedValue);
+                })
                 .collect(Collectors.toSet());
     }
 
