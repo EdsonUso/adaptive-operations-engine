@@ -3,35 +3,35 @@ package br.com.edsonuso.aoeplanner.infrastructure.repository;
 import br.com.edsonuso.aoeplanner.application.ports.out.FactBaseRepositoryPort;
 import br.com.edsonuso.aoeplanner.model.Fact;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.util.Map;
+import java.util.Collections;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Repository
-@Primary
+@Profile("!test")
 @RequiredArgsConstructor
 public class RedisFactBaseRepository implements FactBaseRepositoryPort {
 
-    private static final String FACT_BASE_KEY = "fact-base";
-
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private static final String FACT_KEY_PREFIX = "fact:";
 
     @Override
     public Set<Fact> getCurrentFactBase() {
-        Map<Object, Object> entries = redisTemplate.opsForHash().entries(FACT_BASE_KEY);
-
-        return entries.entrySet().stream()
-                .map(entry -> {
-                    String key = (String) entry.getKey();
-
-                    String rawValue = (String) entry.getValue();
-                    boolean value = "true".equalsIgnoreCase(rawValue) || "1".equals(rawValue);
-                    return new Fact(key, value);
-                })
+        Set<String> keys = redisTemplate.keys(FACT_KEY_PREFIX + "*");
+        if (keys == null || keys.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return keys.stream()
+                .map(key -> new Fact(key.substring(FACT_KEY_PREFIX.length()), redisTemplate.opsForValue().get(key)))
                 .collect(Collectors.toSet());
+    }
+
+    @Override
+    public void updateFactBase(Set<Fact> facts) {
+        facts.forEach(fact -> redisTemplate.opsForValue().set(FACT_KEY_PREFIX + fact.name(), fact.value()));
     }
 }

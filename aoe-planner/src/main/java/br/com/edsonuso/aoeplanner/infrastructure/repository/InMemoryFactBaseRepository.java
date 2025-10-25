@@ -6,18 +6,23 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Repository
 @Profile("test")
 public class InMemoryFactBaseRepository implements FactBaseRepositoryPort {
 
+    private final Map<String, Fact> factBase = new ConcurrentHashMap<>();
 
     @Override
     public Set<Fact> getCurrentFactBase() {
-        Set<Fact> facts = new HashSet<>();
-        facts.add(new Fact("service_web_healthy", false));
-        facts.add(new Fact("port_9090_in_use", true));
-        return facts;
+        return new HashSet<>(factBase.values());
+    }
+
+    @Override
+    public void updateFactBase(Set<Fact> facts) {
+        facts.forEach(fact -> factBase.put(fact.name(), fact));
     }
 }
