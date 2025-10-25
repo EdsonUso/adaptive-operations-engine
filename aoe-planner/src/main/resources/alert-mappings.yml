@@ -1,0 +1,24 @@
+- alertName: "APIServiceDown"
+  matches:
+    service: "aoe-target-app"
+  facts:
+    - name: "service_web_healthy"
+      value: "false"
+    - name: "last_alert_source"
+      value: "{{ .CommonLabels.alertname }}"
+
+- alertName: "HighCpuLoad"
+  matches:
+    severity: "warning"
+  facts:
+    - name: "cpu_load_high"
+      value: "true"
+    - name: "host_with_high_cpu"
+      value: "{{ .CommonLabels.instance }}"
+
+- alertName: "PortInUse"
+  matches:
+    severity: "critical"
+  facts:
+    - name: "port_9090_in_use"
+      value: "true"

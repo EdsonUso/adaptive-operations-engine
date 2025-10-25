@@ -1,48 +1,25 @@
 package br.com.edsonuso.aoeplanner.infrastructure.service;
 
-import br.com.edsonuso.aoeplanner.infrastructure.controller.dto.AlertmanagerWebhookPayload;
+import br.com.edsonuso.aoeplanner.application.ports.out.FactBaseRepositoryPort;
+import br.com.edsonuso.aoeplanner.model.Fact;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Set;
+
 @Service
-@RequiredArgsConstructor
 @Slf4j
+@RequiredArgsConstructor
 public class FactUpdaterService {
 
-    private static final String FACT_BASE_KEY = "fact-base";
-    private final RedisTemplate<String, String> redisTemplate;
+    private final FactBaseRepositoryPort factBaseRepository;
 
-    public void updateFactsFromAlert(AlertmanagerWebhookPayload.Alert alert) {
-        String alertName = alert.getAlertName();
-        boolean isFiring = "firing".equals(alert.status());
-        log.info("Atualizando fact-base a partir do alerta: {} (status: {})", alertName, alert.status());
-
-        String factKey = null;
-        String factValue = null;
-
-        switch (alertName) {
-            case "TargetAppDown":
-                factKey = "service_web_healthy";
-                factValue = isFiring ? "false" : "true";
-                break;
-            case "Port9090Blocked":
-                factKey = "port_9090_in_use";
-                factValue = isFiring ? "true" : "false";
-                break;
-            case "HighCpuLoad":
-                factKey = "cpu_load_high";
-                factValue = isFiring ? "true" : "false";
-                break;
-            default:
-                log.warn("Alerta não reconhecido recebido: {}", alertName);
-                return;
+    public void persistFacts(Set<Fact> facts) {
+        if (facts == null || facts.isEmpty()) {
+            return;
         }
-
-        if (factKey != null) {
-            log.debug("Atualizando fato no Redis: {} -> {}", factKey, factValue);
-            redisTemplate.opsForHash().put(FACT_BASE_KEY, factKey, factValue);
-        }
+        log.info("Persistindo {} fatos na base de fatos.", facts.size());
+        factBaseRepository.updateFactBase(facts);
     }
 }
