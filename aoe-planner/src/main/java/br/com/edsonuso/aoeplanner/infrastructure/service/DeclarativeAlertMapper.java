@@ -109,9 +109,6 @@ public class DeclarativeAlertMapper {
         if ("CommonLabels".equals(sourceName) || "labels".equals(sourceName)) {
             return alert.labels();
         }
-        if ("CommonAnnotations".equals(sourceName) || "annotations".equals(sourceName)) {
-            return alert.annotations();
-        }
         return null;
     }
 
