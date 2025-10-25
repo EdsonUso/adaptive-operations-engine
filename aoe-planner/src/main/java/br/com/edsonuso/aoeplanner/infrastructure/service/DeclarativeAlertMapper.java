@@ -32,7 +32,7 @@ public class DeclarativeAlertMapper {
 
     private List<AlertMapping> cachedMappings;
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-    private static final Pattern TEMPLATE_PATTERN = Pattern.compile("\{\{\s*\.(.*?)\s*\}\}");
+    private static final Pattern TEMPLATE_PATTERN = Pattern.compile("\\{\\{\\s*\\.(.*?)\\s*\\}\\}");
 
 
     @PostConstruct
@@ -93,7 +93,7 @@ public class DeclarativeAlertMapper {
         Matcher matcher = TEMPLATE_PATTERN.matcher(valueTemplate);
         if (matcher.find()) {
             String keyPath = matcher.group(1);
-            String[] keys = keyPath.split("\.");
+            String[] keys = keyPath.split("\\.");
             if (keys.length == 2) {
                 Map<String, String> sourceMap = getSourceMap(keys[0], alert);
                 if (sourceMap != null) {
@@ -106,11 +106,13 @@ public class DeclarativeAlertMapper {
     }
 
     private Map<String, String> getSourceMap(String sourceName, AlertmanagerWebhookPayload.Alert alert) {
-        return switch (sourceName) {
-            case "CommonLabels", "labels" -> alert.labels();
-            case "CommonAnnotations", "annotations" -> alert.annotations();
-            default -> null;
-        };
+        if ("CommonLabels".equals(sourceName) || "labels".equals(sourceName)) {
+            return alert.labels();
+        }
+        if ("CommonAnnotations".equals(sourceName) || "annotations".equals(sourceName)) {
+            return alert.annotations();
+        }
+        return null;
     }
 
     private Object convertToTypedObject(String value) {
