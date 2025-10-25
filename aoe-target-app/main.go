@@ -17,6 +17,18 @@ func main() {
 		http.ServeFile(w, r, "./static/index.html")
 	})
 
+	// Endpoint de depuração para simular alta carga de CPU
+	http.HandleFunc("/debug/burn-cpu", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("ATENÇÃO: Recebida requisição para iniciar alta carga de CPU.")
+		go func() {
+			for {
+				// Loop infinito para consumir 100% de um núcleo
+			}
+		}()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("CPU burn started."))
+	})
+
 	// Endpoint que o Prometheus usará para coletar métricas
 	http.Handle("/metrics", promhttp.Handler())
 

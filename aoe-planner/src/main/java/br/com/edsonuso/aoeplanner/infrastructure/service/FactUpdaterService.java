@@ -31,6 +31,10 @@ public class FactUpdaterService {
                 factKey = "port_9090_in_use";
                 factValue = isFiring ? "true" : "false";
                 break;
+            case "HighCpuLoad":
+                factKey = "cpu_load_high";
+                factValue = isFiring ? "true" : "false";
+                break;
             default:
                 log.warn("Alerta não reconhecido recebido: {}", alertName);
                 return;

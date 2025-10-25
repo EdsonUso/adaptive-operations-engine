@@ -7,6 +7,7 @@ import br.com.edsonuso.aoeplanner.model.Action;
 import br.com.edsonuso.aoeplanner.model.Fact;
 import br.com.edsonuso.aoeplanner.model.Goal;
 import br.com.edsonuso.aoeplanner.model.Plan;
+import br.com.edsonuso.aoeplanner.model.PlanDispatchPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -69,8 +70,8 @@ class GoalControllerTest {
                 Map.of("service_web_healthy", true)
         );
 
-        // 4. Preparar um "capturador" para pegar o plano que será publicado
-        ArgumentCaptor<Plan> planCaptor = ArgumentCaptor.forClass(Plan.class);
+        // 4. Preparar um "capturador" para pegar o payload que será publicado
+        ArgumentCaptor<PlanDispatchPayload> payloadCaptor = ArgumentCaptor.forClass(PlanDispatchPayload.class);
 
         // Act: Executar a ação a ser testada
         mockMvc.perform(post("/api/goals")
@@ -81,8 +82,8 @@ class GoalControllerTest {
         // Assert: Verificar os resultados
 
         // 1. Verificar se o método publish foi chamado no nosso publisher mockado
-        verify(planPublisher).publish(planCaptor.capture());
-        Plan publishedPlan = planCaptor.getValue();
+        verify(planPublisher).publish(payloadCaptor.capture());
+        Plan publishedPlan = payloadCaptor.getValue().plan();
 
         // 2. Verificar se o plano gerado está correto
         assertNotNull(publishedPlan, "O plano publicado não deve ser nulo.");
@@ -113,7 +114,7 @@ class GoalControllerTest {
                 Map.of("service_web_healthy", true)
         );
 
-        ArgumentCaptor<Plan> planCaptor = ArgumentCaptor.forClass(Plan.class);
+        ArgumentCaptor<PlanDispatchPayload> payloadCaptor = ArgumentCaptor.forClass(PlanDispatchPayload.class);
 
         // Act
         mockMvc.perform(post("/api/goals")
@@ -122,8 +123,8 @@ class GoalControllerTest {
                 .andExpect(status().isAccepted());
 
         // Assert
-        verify(planPublisher).publish(planCaptor.capture());
-        Plan publishedPlan = planCaptor.getValue();
+        verify(planPublisher).publish(payloadCaptor.capture());
+        Plan publishedPlan = payloadCaptor.getValue().plan();
 
         assertNotNull(publishedPlan, "O plano não deve ser nulo.");
         assertEquals(2, publishedPlan.steps().size(), "O plano deve conter exatamente dois passos.");

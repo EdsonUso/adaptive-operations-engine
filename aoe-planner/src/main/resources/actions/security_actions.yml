@@ -1,0 +1,11 @@
+- name: RemoveMaliciousContainers
+  preconditions:
+    malicious_containers_present: true
+  effects:
+    malicious_containers_present: false
+  cost: 20
+  executor:
+    type: "http"
+    method: "POST"
+    url: "http://service-manager:8081/actions/remove-malicious-containers"
+    body: '{ "pattern": "miner" }'

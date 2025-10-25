@@ -18,3 +18,12 @@ groups:
         annotations:
           summary: 'Porta 9090 está bloqueada'
           description: 'A porta 9090 parece estar bloqueada por outro processo, impedindo a inicialização do serviço.'
+
+      - alert: HighCpuLoad
+        expr: aoe_cpu_load_high{job="aoe-service-manager"} == 1
+        for: 15s
+        labels:
+          severity: 'critical'
+        annotations:
+          summary: 'Carga de CPU Alta Detectada'
+          description: 'O sistema detectou uma carga de CPU anormalmente alta, potencialmente causada por um processo descontrolado.'

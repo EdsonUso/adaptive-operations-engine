@@ -28,7 +28,8 @@ public class RedisFactBaseRepository implements FactBaseRepositoryPort {
                 .map(entry -> {
                     String key = (String) entry.getKey();
 
-                    boolean value = Boolean.parseBoolean((String) entry.getValue());
+                    String rawValue = (String) entry.getValue();
+                    boolean value = "true".equalsIgnoreCase(rawValue) || "1".equals(rawValue);
                     return new Fact(key, value);
                 })
                 .collect(Collectors.toSet());

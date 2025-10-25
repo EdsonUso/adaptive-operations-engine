@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,20 +18,22 @@ var (
 		Name: "aoe_port_in_use",
 		Help: "Indica se a porta 9090 está em uso por um processo bloqueador (1 para em uso, 0 para livre).",
 	})
+	cpuLoadHigh = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "aoe_cpu_load_high",
+		Help: "Indica se a carga de CPU do container alvo está alta (1 para alta, 0 para normal).",
+	})
 )
+
+const CPU_THRESHOLD = 50.0
 
 func init() {
 	prometheus.MustRegister(portInUse)
+	prometheus.MustRegister(cpuLoadHigh)
 }
 
-// RestartContainerRequest é a estrutura para o corpo da requisição de restart.
+// Structs para as requisições JSON
 type RestartContainerRequest struct {
 	ContainerName string `json:"containerName"`
-}
-
-// KillPortRequest é a estrutura para o corpo da requisição de matar processo na porta.
-type KillPortRequest struct {
-	Port int `json:"port"`
 }
 
 // recordMetrics verifica periodicamente o estado do sistema e atualiza as métricas do Prometheus.
@@ -37,14 +41,27 @@ func recordMetrics() {
 	for {
 		// Lógica para verificar se a porta está em uso
 		cmdPortBlocker := exec.Command("docker", "ps", "-q", "--filter", "name=port-blocker")
-		outputPortBlocker, err := cmdPortBlocker.CombinedOutput()
-		if err != nil {
-			log.Printf("Erro ao verificar o contêiner port-blocker para métricas: %s", string(outputPortBlocker))
+		outputPortBlocker, _ := cmdPortBlocker.CombinedOutput()
+		if len(outputPortBlocker) > 0 {
+			portInUse.Set(1)
 		} else {
-			if len(outputPortBlocker) > 0 {
-				portInUse.Set(1)
+			portInUse.Set(0)
+		}
+
+		// Lógica para verificar a CPU do aoe-target-app
+		cmdStats := exec.Command("docker", "stats", "--no-stream", "--format", "{{.CPUPerc}}", "aoe-target-app")
+		outputStats, err := cmdStats.CombinedOutput()
+		if err != nil {
+			// O container pode não estar rodando, o que é um estado válido
+			cpuLoadHigh.Set(0)
+		} else {
+			cpuStr := strings.TrimSuffix(string(outputStats), "\n")
+			cpuStr = strings.TrimSuffix(cpuStr, "%")
+			cpuVal, err := strconv.ParseFloat(cpuStr, 64)
+			if err == nil && cpuVal > CPU_THRESHOLD {
+				cpuLoadHigh.Set(1)
 			} else {
-				portInUse.Set(0)
+				cpuLoadHigh.Set(0)
 			}
 		}
 
@@ -52,19 +69,12 @@ func recordMetrics() {
 	}
 }
 
-// handleRestartContainer lida com a lógica de reiniciar um contêiner Docker.
 func handleRestartContainer(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
-
 	var req RestartContainerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Corpo da requisição inválido", http.StatusBadRequest)
 		return
 	}
-
 	log.Printf("Recebida solicitação para reiniciar o contêiner: %s", req.ContainerName)
 	cmd := exec.Command("docker", "restart", req.ContainerName)
 	output, err := cmd.CombinedOutput()
@@ -73,77 +83,73 @@ func handleRestartContainer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, string(output), http.StatusInternalServerError)
 		return
 	}
-
 	log.Printf("Contêiner %s reiniciado com sucesso.", req.ContainerName)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Contêiner reiniciado com sucesso."))
 }
 
-// handleKillProcessOnPort lida com a lógica de parar o contêiner que bloqueia a porta.
-// Para a PoC, ele para um contêiner com nome fixo "port-blocker".
 func handleKillProcessOnPort(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
+	const containerToKill = "port-blocker"
+	log.Printf("Recebida solicitação para liberar a porta, parando o contêiner %s", containerToKill)
+	cmd := exec.Command("docker", "stop", containerToKill)
+	cmd.CombinedOutput() // Ignora o erro se o contêiner não existir
+	log.Printf("Contêiner %s parado com sucesso.", containerToKill)
+	w.WriteHeader(http.StatusOK)
+}
 
-	var req KillPortRequest
+// Struct para a requisição de remoção de contêineres maliciosos
+type RemoveMaliciousRequest struct {
+	Pattern string `json:"pattern"`
+}
+
+func handleRemoveMaliciousContainers(w http.ResponseWriter, r *http.Request) {
+	var req RemoveMaliciousRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Corpo da requisição inválido", http.StatusBadRequest)
 		return
 	}
+	log.Printf("Recebida solicitação para remover contêineres com padrão: %s", req.Pattern)
 
-	const containerToKill = "port-blocker"
-	log.Printf("Recebida solicitação para liberar a porta %d, parando o contêiner %s", req.Port, containerToKill)
-
-	cmd := exec.Command("docker", "stop", containerToKill)
-	output, err := cmd.CombinedOutput()
+	// Listar containers com o padrão no nome
+	cmdList := exec.Command("docker", "ps", "-q", "--filter", "name="+req.Pattern)
+	output, err := cmdList.CombinedOutput()
 	if err != nil {
-		log.Printf("Erro ao parar o contêiner %s: %s", containerToKill, string(output))
-		// Ignora o erro se o contêiner não existir, pois o objetivo (liberar a porta) foi alcançado.
+		log.Printf("Erro ao listar contêineres com padrão %s: %s", req.Pattern, string(output))
+		http.Error(w, string(output), http.StatusInternalServerError)
+		return
 	}
 
-	log.Printf("Contêiner %s parado com sucesso.", containerToKill)
+	containerIDs := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(containerIDs) == 1 && containerIDs[0] == "" {
+		log.Printf("Nenhum contêiner encontrado com o padrão: %s", req.Pattern)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Nenhum contêiner malicioso encontrado."))
+		return
+	}
+
+	log.Printf("Contêineres maliciosos encontrados: %v", containerIDs)
+	for _, id := range containerIDs {
+		if id == "" {
+			continue
+		}
+		log.Printf("Removendo contêiner: %s", id)
+		cmdRemove := exec.Command("docker", "rm", "-f", id)
+		removeOutput, err := cmdRemove.CombinedOutput()
+		if err != nil {
+			log.Printf("Erro ao remover o contêiner %s: %s", id, string(removeOutput))
+			// Não retorna erro aqui para tentar remover os outros
+		} else {
+			log.Printf("Contêiner %s removido com sucesso.", id)
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Processo bloqueando a porta foi finalizado."))
 }
 
-func handleCheckPort(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// --- Verificação do Port Blocker ---
-	cmdPortBlocker := exec.Command("docker", "ps", "-q", "--filter", "name=port-blocker")
-	outputPortBlocker, err := cmdPortBlocker.CombinedOutput()
-	if err != nil {
-		log.Printf("Erro ao verificar o contêiner port-blocker: %s", string(outputPortBlocker))
-		http.Error(w, string(outputPortBlocker), http.StatusInternalServerError)
-		return
-	}
-	portInUse := len(outputPortBlocker) > 0
-
-	// --- Verificação do App Alvo ---
-	cmdTargetApp := exec.Command("docker", "ps", "-q", "--filter", "name=aoe-target-app")
-	outputTargetApp, err := cmdTargetApp.CombinedOutput()
-	if err != nil {
-		log.Printf("Erro ao verificar o contêiner aoe-target-app: %s", string(outputTargetApp))
-		http.Error(w, string(outputTargetApp), http.StatusInternalServerError)
-		return
-	}
-	serviceHealthy := len(outputTargetApp) > 0
-
-	log.Printf("Diagnóstico completo: port_9090_in_use=%t, service_web_healthy=%t", portInUse, serviceHealthy)
-
-	// Retorna ambos os fatos descobertos
-	response := map[string]bool{
-		"port_9090_in_use":    portInUse,
-		"service_web_healthy": serviceHealthy,
-	}
-
+func handleDiagnostics(w http.ResponseWriter, r *http.Request) {
+	log.Println("Recebida solicitação de diagnóstico. Retornando estado vazio.")
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("{}")) // Return an empty JSON object
 }
 
 func main() {
@@ -152,7 +158,8 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/actions/restart-container", handleRestartContainer)
 	mux.HandleFunc("/actions/kill-process-on-port", handleKillProcessOnPort)
-	mux.HandleFunc("/diagnostics/check-port", handleCheckPort)
+	mux.HandleFunc("/actions/remove-malicious-containers", handleRemoveMaliciousContainers)
+	mux.HandleFunc("/diagnostics/check-port", handleDiagnostics)
 	mux.Handle("/metrics", promhttp.Handler())
 
 	log.Println("Service Manager iniciado na porta 8081...")
